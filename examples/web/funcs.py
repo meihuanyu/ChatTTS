@@ -1,6 +1,8 @@
 import random
 from typing import Optional
 from time import sleep
+import json
+import os
 
 import gradio as gr
 
@@ -28,35 +30,46 @@ use_mp3 = has_ffmpeg_installed()
 if not use_mp3:
     logger.warning("no ffmpeg installed, use wav file output")
 
-# 音色选项：用于预置合适的音色
-voices = {
-    "Default": {"seed": 2},
-    "Timbre1": {"seed": 1111},
-    "Timbre2": {"seed": 2222},
-    "Timbre3": {"seed": 3333},
-    "Timbre4": {"seed": 4444},
-    "Timbre5": {"seed": 5555},
-    "Timbre6": {"seed": 6666},
-    "Timbre7": {"seed": 7777},
-    "Timbre8": {"seed": 8888},
-    "Timbre9": {"seed": 9999},
-}
+# 加载预设声音配置
+def load_voice_config():
+    voice_config_path = os.path.join(os.path.dirname(__file__), "slct_voice_240605.json")
+    try:
+        with open(voice_config_path, 'r', encoding='utf-8') as f:
+            voice_config = json.load(f)
+        return voice_config
+    except Exception as e:
+        logger.error(f"Failed to load voice config: {e}")
+        return {}
 
+# 音色选项：从配置文件加载
+voice_config = load_voice_config()
+voices = {f"{k}-{v['describe']}": {"id": k, "config": v} for k, v in voice_config.items()}
+if not voices:
+    voices = {"Default": {"seed": 2}}
 
 def generate_seed():
     return gr.update(value=random.randint(seed_min, seed_max))
 
-
-# 返回选择音色对应的seed
-def on_voice_change(vocie_selection):
-    return voices.get(vocie_selection)["seed"]
-
+# 返回选择的声音配置
+def on_voice_change(voice_selection):
+    if voice_selection in voices:
+        voice_config = voices[voice_selection]["config"]
+        if "tensor" in voice_config:
+            # 直接使用 tensor 数据
+            tensor_data = voice_config["tensor"]
+            # 将 list 转换为 tensor
+            import torch
+            import numpy as np
+            tensor = torch.from_numpy(np.array(tensor_data, dtype=np.float32))
+            # 将 tensor 数据转换为 base16384 编码的字符串
+            spk_emb = chat.speaker._encode(tensor)
+            return spk_emb
+    return None
 
 def on_audio_seed_change(audio_seed_input):
     with TorchSeedContext(audio_seed_input):
         rand_spk = chat.sample_random_speaker()
     return rand_spk
-
 
 def load_chat(cust_path: Optional[str], coef: Optional[str]) -> bool:
     if cust_path == None:

@@ -90,9 +90,9 @@ def main():
 
         with gr.Row():
             voice_selection = gr.Dropdown(
-                label="Timbre",
-                choices=voices.keys(),
-                value="Default",
+                label="声音选择",
+                choices=list(voices.keys()),
+                value=list(voices.keys())[0] if voices else None,
                 interactive=True,
             )
             audio_seed_input = gr.Number(
@@ -164,7 +164,9 @@ def main():
 
         # 使用Gradio的回调功能来更新数值输入框
         voice_selection.change(
-            fn=on_voice_change, inputs=voice_selection, outputs=audio_seed_input
+            fn=on_voice_change,
+            inputs=voice_selection,
+            outputs=spk_emb_text,
         )
 
         generate_audio_seed.click(generate_seed, outputs=audio_seed_input)
